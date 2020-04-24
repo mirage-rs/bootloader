@@ -1,0 +1,85 @@
+[config]
+skip_core_tasks = true
+min_version = "0.22.0"
+default_to_workspace = false
+
+# General environment configuration.
+[env]
+BOOTLOADER_ARM_TARGET = "armv4t-mirage-eabi.json"
+
+# Environment configuration for debug builds.
+[env.development]
+PROFILE_NAME = "debug"
+COMPILER_FLAGS = ""
+
+# Environment configuration for release builds.
+[env.production]
+PROFILE_NAME = "release"
+COMPILER_FLAGS = "--release"
+
+# rustup component add rust-src; Required by cargo-xbuild.
+[tasks.install-rust-src]
+install_crate = { rustup_component_name = "rust-src" }
+
+# rustup component add llvm-tools-preview; Required by cargo-binutils.
+[tasks.install-llvm-tools-preview]
+install_crate = { rustup_component_name = "llvm-tools-preview" }
+
+# cargo install cargo-binutils
+[tasks.install-cargo-binutils]
+dependencies = ["install-llvm-tools-preview"]
+install_crate = { crate_name = "cargo-binutils", binary = "cargo", test_arg = ["objcopy", "--help"] }
+
+# cargo install cargo-xbuild
+[tasks.install-cargo-xbuild]
+dependencies = ["install-rust-src"]
+install_crate = { crate_name = "cargo-xbuild", binary = "cargo", test_arg = ["xbuild", "--help"], min_version = "0.5.14" }
+
+# Builds the bootloader binary.
+[tasks.bootloader-build]
+description = "Builds the bootloader."
+env = { "RUSTFLAGS" = "--sysroot ${CARGO_MAKE_WORKING_DIRECTORY}/target/sysroot" }
+dependencies = ["install-cargo-xbuild"]
+command = "cargo"
+args = [
+    "xbuild",
+    "--target=${BOOTLOADER_ARM_TARGET}",
+    "@@split(COMPILER_FLAGS, )"
+]
+
+# Builds the bootloader and converts it to an ARM payload in .bin format.
+[tasks.bootloader]
+description = "Builds the bootloader as an RCM payload."
+env = { "RUSTFLAGS" = "--sysroot ${CARGO_MAKE_WORKING_DIRECTORY}/target/sysroot" }
+dependencies = ["bootloader-build", "install-cargo-binutils"]
+command = "cargo"
+args = [
+    "objcopy",
+    "--target=${BOOTLOADER_ARM_TARGET}",
+    "--bin=bootloader",
+    "@@split(COMPILER_FLAGS, )",
+    "--",
+    "-O",
+    "binary",
+    "bootloader.bin"
+]
+
+# Cleans up the bootloader build results.
+[tasks.bootloader-clean]
+script_runner = "@shell"
+script = [
+    '''
+    rm -f bootloader.bin
+    '''
+]
+
+# Cleans up the build.
+[tasks.clean]
+description = "Cleans up the build environment."
+dependencies = ["bootloader-clean"]
+command = "cargo"
+args = ["clean"]
+
+# Default project build task.
+[tasks.default]
+run_task = "bootloader"
