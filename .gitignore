@@ -15,7 +15,5 @@ Thumbs.db
 /.vscode/
 /.idea/
 
-
-#Added by cargo
-
-/target
+# Build results
+*.bin
