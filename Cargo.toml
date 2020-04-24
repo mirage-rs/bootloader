@@ -9,3 +9,4 @@ memcpy = true
 sysroot_path = "target/sysroot"
 
 [dependencies]
+libtegra = { git = "https://github.com/mirage-rs/libtegra.git" }
