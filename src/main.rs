@@ -11,6 +11,8 @@ global_asm!(include_str!("crt0.S"));
 
 #[macro_use]
 extern crate libtegra;
+// Required for memory functions (memset, memcpy, etc) in the assembly code.
+extern crate rlibc;
 
 use core::panic::PanicInfo;
 
@@ -19,10 +21,6 @@ use libtegra::{
     pinmux::{PinGrP, PinTristate},
     timer::sleep,
 };
-
-// This import is used by the crt0.S code, but rustc can't detect that.
-#[allow(unused)]
-use rlibc::memset;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo<'_>) -> ! {
