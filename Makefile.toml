@@ -30,19 +30,14 @@ install_crate = { rustup_component_name = "llvm-tools-preview" }
 dependencies = ["install-llvm-tools-preview"]
 install_crate = { crate_name = "cargo-binutils", binary = "cargo", test_arg = ["objcopy", "--help"] }
 
-# cargo install cargo-xbuild
-[tasks.install-cargo-xbuild]
-dependencies = ["install-rust-src"]
-install_crate = { crate_name = "cargo-xbuild", binary = "cargo", test_arg = ["xbuild", "--help"], min_version = "0.5.14" }
-
 # Builds the bootloader binary.
 [tasks.bootloader-build]
 description = "Builds the bootloader."
 env = { "RUSTFLAGS" = "--sysroot ${CARGO_MAKE_WORKING_DIRECTORY}/target/sysroot" }
-dependencies = ["install-cargo-xbuild"]
 command = "cargo"
 args = [
-    "xbuild",
+    "build",
+    "-Zbuild-std=core,compiler_builtins",
     "--target=${BOOTLOADER_ARM_TARGET}",
     "@@split(COMPILER_FLAGS, )"
 ]

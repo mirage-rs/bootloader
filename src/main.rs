@@ -14,7 +14,15 @@ extern crate libtegra;
 
 use core::panic::PanicInfo;
 
-use libtegra::{gpio, pinmux::{PinGrP, PinTristate}, timer::sleep};
+use libtegra::{
+    gpio,
+    pinmux::{PinGrP, PinTristate},
+    timer::sleep,
+};
+
+// This import is used by the crt0.S code, but rustc can't detect that.
+#[allow(unused)]
+use rlibc::memset;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo<'_>) -> ! {
