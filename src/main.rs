@@ -24,6 +24,8 @@ const KEY_BUFFER: *const u8 = 0x40013720 as *const _;
 const PK11_ADDRESS: *const u8 = 0x40016FE0 as *const _;
 /// The size of the PK11 blob.
 const PK11_SIZE: usize = 0x28810;
+/// The base address of the exception vectors.
+const EXCEPTION_VECTOR_BASE: usize = 0x6000F200;
 
 /// Returns the range of the .bss section.
 pub unsafe fn bss_range() -> Range<*mut u32> {
@@ -49,12 +51,16 @@ pub unsafe fn stack_top() -> *const u8 {
 
 #[panic_handler]
 fn panic(_info: &PanicInfo<'_>) -> ! {
-    // TODO: Implement a proper panic handler.
-    loop {}
+    panic::panic_handler()
 }
 
 #[no_mangle]
 unsafe extern "C" fn main() {
     // Zero .bss section
     mem::memset(bss_range(), 0);
+
+    // Setup the panic_handler
+    panic::setup_exception_vector();
+
+    // TODO: Call init methods
 }
