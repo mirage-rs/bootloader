@@ -1,6 +1,3 @@
-.extern memset
-.type memset, %function
-
 .extern main
 .type main, %function
 
@@ -65,13 +62,6 @@ relocator_end:
 start:
     // Set the stack pointer.
     ldr sp, =__stack_top__
-
-    // Clear .bss section.
-    ldr r0, =__bss_start__
-    mov r1, #0
-    ldr r2, =__bss_end__
-    sub r2, r2, r0
-    bl memset
 
     // Jump to Rust entrypoint.
     bl main

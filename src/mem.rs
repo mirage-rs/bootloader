@@ -2,59 +2,34 @@
 
 #![no_builtins]
 
-use core::ptr;
+use core::{ops::Range, ptr};
 
-#[no_mangle]
-pub unsafe extern "C" fn memset(ptr: *mut u8, val: u8, n: usize) -> *mut u8 {
-    let mut offset = 0;
-    while offset < n {
-        ptr::write_volatile(ptr.offset(offset as isize), val);
-        offset += 1;
-    }
-    ptr
+mod sealed {
+    pub trait Sealed {}
 }
+/// Trait for machine word types.
+///
+/// This trait is implemented by unsigned integers representing common machine
+/// word sizes.
+pub unsafe trait Word: sealed::Sealed + Copy {}
 
-#[no_mangle]
-pub unsafe extern "C" fn memcmp(ptr1: *const u8, ptr2: *const u8, n: usize) -> i32 {
-    let mut offset = 0;
-    while offset < n {
-        let a = ptr::read_volatile(ptr1.offset(offset as isize));
-        let b = ptr::read_volatile(ptr2.offset(offset as isize));
-        if a != b {
-            return a as i32 - b as i32;
-        }
-        offset += 1;
-    }
-    0
-}
+impl sealed::Sealed for u8 {}
+impl sealed::Sealed for u16 {}
+impl sealed::Sealed for u32 {}
+impl sealed::Sealed for u64 {}
+impl sealed::Sealed for u128 {}
 
-#[no_mangle]
-pub unsafe extern "C" fn memcpy(dst: *mut u8, src: *const u8, n: usize) -> *mut u8 {
-    let mut offset = 0;
-    while offset < n {
-        let val = ptr::read_volatile(src.offset(offset as isize));
-        ptr::write_volatile(dst.offset(offset as isize), val);
-        offset += 1;
-    }
-    dst
-}
+unsafe impl Word for u8 {}
+unsafe impl Word for u16 {}
+unsafe impl Word for u32 {}
+unsafe impl Word for u64 {}
+unsafe impl Word for u128 {}
 
-#[no_mangle]
-pub unsafe extern "C" fn memmove(dst: *mut u8, src: *const u8, n: usize) -> *mut u8 {
-    if src < dst as *const u8 {
-        let mut offset = n;
-        while offset != 0 {
-            offset -= 1;
-            let val = ptr::read_volatile(src.offset(offset as isize));
-            ptr::write_volatile(dst.offset(offset as isize), val);
-        }
-    } else {
-        let mut offset = 0;
-        while offset < n {
-            let val = ptr::read_volatile(src.offset(offset as isize));
-            ptr::write_volatile(dst.offset(offset as isize), val);
-            offset += 1;
-        }
+/// Fills the bytes in the given `range` with the given value `val`.
+pub unsafe fn memset<T: Word>(range: Range<*mut T>, val: T) {
+    let mut ptr = range.start;
+    while ptr < range.end {
+        ptr::write_volatile(ptr, val);
+        ptr = ptr.offset(1);
     }
-    dst
 }
