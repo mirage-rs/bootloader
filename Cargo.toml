@@ -10,4 +10,3 @@ sysroot_path = "target/sysroot"
 
 [dependencies]
 libtegra = { git = "https://github.com/mirage-rs/libtegra.git" }
-rlibc = "1.0.0"

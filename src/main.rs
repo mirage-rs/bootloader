@@ -11,8 +11,8 @@ global_asm!(include_str!("crt0.S"));
 
 #[macro_use]
 extern crate libtegra;
-// Required for memory functions (memset, memcpy, etc) in the assembly code.
-extern crate rlibc;
+
+mod mem;
 
 use core::panic::PanicInfo;
 
