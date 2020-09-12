@@ -7,15 +7,18 @@
 #[cfg(not(any(target_arch = "arm", rustdoc, test)))]
 compile_error!("Please compile the first bootloader stage for ARM7TDMI!");
 
-// Load crt0 from Assembly.
-global_asm!(include_str!("crt0.S"));
-
 extern crate libtegra;
 
+mod init;
 mod mem;
 mod panic;
 
 use core::{ops::Range, panic::PanicInfo};
+
+use init::init_hardware;
+
+// Load crt0 from Assembly.
+global_asm!(include_str!("crt0.S"));
 
 /// The buffer where the PK11 key is located
 const KEY_BUFFER: *const u8 = 0x40013720 as *const _;
@@ -56,11 +59,14 @@ fn panic(_info: &PanicInfo<'_>) -> ! {
 
 #[no_mangle]
 unsafe extern "C" fn main() {
-    // Zero .bss section
+    // Initialize the hardware from the early bootrom context we're currently in.
+    init_hardware();
+
+    // Zero .bss section.
     mem::memset(bss_range(), 0);
 
-    // Setup the panic_handler
+    // Setup the panic_handler.
     panic::setup_exception_vector();
 
-    // TODO: Call init methods
+    // TODO: Call init methods.
 }
