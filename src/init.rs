@@ -232,6 +232,15 @@ fn config_pinmux() {
     }
 }
 
+fn config_pmc_scratch(pmc: &pmc::Registers) {
+    // Unset Debug console from Customer Option.
+    pmc.APBDEV_PMC_SCRATCH20_0.set(pmc.APBDEV_PMC_SCRATCH20_0.get() & 0xFFF3_FFFF);
+    // Unset DATA_DQ_E_IVREF EMC_PMACRO_DATA_PAD_TX_CTRL.
+    pmc.APBDEV_PMC_SCRATCH190_0.set(pmc.APBDEV_PMC_SCRATCH190_0.get() & 0xFFFF_FFFE);
+    // Disable the fuse private key.
+    pmc.APBDEV_PMC_SECURE_SCRATCH21_0.set(pmc.APBDEV_PMC_SECURE_SCRATCH21_0.get() | 0x10);
+}
+
 /// Performs hardware initialization for the Tegra X1 SoC.
 pub fn init_hardware() -> Result<(), Error> {
     let car = unsafe { &*car::REGISTERS };
@@ -282,6 +291,10 @@ pub fn init_hardware() -> Result<(), Error> {
 
     // Configure SD0 voltage.
     I2c::C5.write_byte(MAX77620_PWR, 0x16, 0x2A)?;
+
+    // Configure and lock PMC scratch registers.
+    // XXX: Starting from 4.0.0+, this was removed.
+    config_pmc_scratch(pmc);
 
     // Set SCLK to PLLP_OUT (408MHz).
     car.CLK_RST_CONTROLLER_SCLK_BURST_POLICY_0.set(0x2000_3333);
