@@ -1,25 +1,15 @@
 //! Hardware initialization code for the Tegra X1 for the early bootrom context imposed
 //! by the RCM exploit CVE-2018-6242.
 
-use libtegra::{
-    apb,
-    car,
-    fuse,
-    gpio,
-    mc,
-    pmc,
-    pinmux::{
-        PinGrP,
-        PinFunction,
-        PinPull,
-        PinTristate,
-        PinIo,
-        PinLock,
-        PinOd,
-        PinEIoHv,
-    },
-    timer,
+use libtegra::i2c::{I2c, Error};
+use libtegra::pinmux::{
+    PinEIoHv, PinFunction, PinGrP, PinIo, PinLock, PinOd, PinPull, PinTristate,
 };
+#[cfg(feature = "debug_uart_port")]
+use libtegra::uart::{Uart, BAUD_115200};
+use libtegra::{apb, car, fuse, gpio, mc, pmc, timer};
+
+const MAX77620_PWR: u32 = 0x3C;
 
 // TODO: Configure remaining GPIOs for the advanced stages of the system here?
 const GPIO_CONFIG: [(gpio::Gpio, gpio::Config); 6] = [
@@ -39,7 +29,8 @@ const PIN_CONFIG: [(
     PinIo,
     PinLock,
     PinOd,
-    PinEIoHv); 12] = [
+    PinEIoHv,
+); 12] = [
     // UART-A TX
     (
         PinGrP::Uart1TxPu0,
@@ -179,8 +170,7 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
     let timer = unsafe { &*timer::timerus::REGISTERS };
 
     // Set CLK_M_DIVISOR to 2.
-    car
-        .CLK_RST_CONTROLLER_SPARE_REG0_0
+    car.CLK_RST_CONTROLLER_SPARE_REG0_0
         .set((car.CLK_RST_CONTROLLER_SPARE_REG0_0.get() & 0xFFFF_FFF3) | 0x4);
     // Set counter frequency.
     sysctr0.SYSCTR0_CNTFID0_0.set(0x124F800);
@@ -190,30 +180,24 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
     car.CLK_RST_CONTROLLER_OSC_CTRL_0.set(0x5000_0071);
 
     // Set LP0 OSC drive strength.
-    pmc
-        .APBDEV_PMC_OSC_EDPD_OVER_0
+    pmc.APBDEV_PMC_OSC_EDPD_OVER_0
         .set((pmc.APBDEV_PMC_OSC_EDPD_OVER_0.get() & 0xFFFF_FF81) | 0xE);
-    pmc
-        .APBDEV_PMC_OSC_EDPD_OVER_0
+    pmc.APBDEV_PMC_OSC_EDPD_OVER_0
         .set((pmc.APBDEV_PMC_OSC_EDPD_OVER_0.get() & 0xFFBF_FFFF) | 0x400000);
-    pmc
-        .APBDEV_PMC_CNTRL2_0
+    pmc.APBDEV_PMC_CNTRL2_0
         .set((pmc.APBDEV_PMC_CNTRL2_0.get() & 0xFFFF_EFFF) | 0x1000);
     // LP0 EMC2TMC_CFG_XM2COMP_PU_VREF_SEL_RANGE.
-    pmc
-        .APBDEV_PMC_SCRATCH188_0
+    pmc.APBDEV_PMC_SCRATCH188_0
         .set((pmc.APBDEV_PMC_SCRATCH188_0.get() & 0xFCFF_FFFF) | 0x2000000);
 
     // Set HCLK div to 2 and PCLK div to 1.
     car.CLK_RST_CONTROLLER_CLK_SYSTEM_RATE_0.set(0x10);
     // PLLMB disable.
-    car
-        .CLK_RST_CONTROLLER_PLLMB_BASE_0
+    car.CLK_RST_CONTROLLER_PLLMB_BASE_0
         .set(car.CLK_RST_CONTROLLER_PLLMB_BASE_0.get() & 0xBFFF_FFFF);
 
     // 0x249F = 19200000 * (16 / 32.768 KHz)
-    pmc
-        .APBDEV_PMC_TSC_MULT_0
+    pmc.APBDEV_PMC_TSC_MULT_0
         .set((pmc.APBDEV_PMC_TSC_MULT_0.get() & 0xFFFF_0000) | 0x249F);
 
     // Set BPMP/SCLK div to 1.
@@ -228,7 +212,12 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
 
 fn config_pinmux() {
     // Clamp inputs when tristated.
-    unsafe { (&*apb::misc::REGISTERS).pp.APB_MISC_PP_PINMUX_GLOBAL_0_0.set(0) };
+    unsafe {
+        (&*apb::misc::REGISTERS)
+            .pp
+            .APB_MISC_PP_PINMUX_GLOBAL_0_0
+            .set(0)
+    };
 
     // Configure the pin multiplexing.
     for entry in PIN_CONFIG.iter() {
@@ -244,7 +233,7 @@ fn config_pinmux() {
 }
 
 /// Performs hardware initialization for the Tegra X1 SoC.
-pub fn init_hardware() {
+pub fn init_hardware() -> Result<(), Error> {
     let car = unsafe { &*car::REGISTERS };
     let pmc = unsafe { &*pmc::REGISTERS };
 
@@ -263,4 +252,39 @@ pub fn init_hardware() {
 
     // Initialize the SoC pin configurations.
     config_pinmux();
+
+    // Initialize UART E for debugging, if desired.
+    #[cfg(feature = "debug_uart_port")]
+    Uart::E.init(BAUD_115200);
+
+    // Reboot the Dynamic Voltage and Frequency Scaling device.
+    car::Clock::CL_DVFS.enable();
+
+    // Reboot the TZRAM device.
+    car::Clock::TZRAM.enable();
+
+    // Initialize the I2C1 and I2CPWR devices.
+    I2c::C1.init();
+    I2c::C5.init();
+
+    // Configure the PMIC.
+    I2c::C5.write_byte(MAX77620_PWR, 0x4, 0x40)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x41, 0x60)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x43, 0x38)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x44, 0x3A)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x45, 0x38)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x4A, 0xF)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x4E, 0xC7)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x4F, 0x4F)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x50, 0x29)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x52, 0x1B)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x56, 0x22)?;
+
+    // Configure SD0 voltage.
+    I2c::C5.write_byte(MAX77620_PWR, 0x16, 0x2A)?;
+
+    // Set SCLK to PLLP_OUT (408MHz).
+    car.CLK_RST_CONTROLLER_SCLK_BURST_POLICY_0.set(0x2000_3333);
+
+    Ok(())
 }

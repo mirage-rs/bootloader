@@ -6,3 +6,7 @@ edition = "2018"
 
 [dependencies]
 libtegra = { git = "https://github.com/mirage-rs/libtegra.git" }
+
+[features]
+# Configures UART E for debug logging.
+debug_uart_port = []

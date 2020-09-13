@@ -61,7 +61,7 @@ fn panic(_info: &PanicInfo<'_>) -> ! {
 #[no_mangle]
 unsafe extern "C" fn main() {
     // Initialize the hardware from the early bootrom context we're currently in.
-    init_hardware();
+    init_hardware().expect("Failed to initialize the hardware!");
 
     // Zero .bss section.
     mem::memset(bss_range(), 0);

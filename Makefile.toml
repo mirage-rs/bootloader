@@ -10,7 +10,7 @@ BOOTLOADER_ARM_TARGET = "armv4t-mirage-eabi.json"
 # Environment configuration for debug builds.
 [env.development]
 PROFILE_NAME = "debug"
-COMPILER_FLAGS = ""
+COMPILER_FLAGS = "--all-features"
 
 # Environment configuration for release builds.
 [env.production]
