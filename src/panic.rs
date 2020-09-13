@@ -1,57 +1,91 @@
-//! The panic / exception handler.
+//! Implementations of functions related to panic and exception handling in
+//! the early boot stage.
 
-use crate::{mem, EXCEPTION_VECTOR_BASE, PK11_ADDRESS, PK11_SIZE};
+#[cfg(feature = "debug_uart_port")]
+use core::fmt::Write;
+use core::panic::PanicInfo;
+
+use libtegra::memory_map::EXCEPTION_VECTORS;
+#[cfg(feature = "debug_uart_port")]
+use libtegra::uart::Uart;
 use libtegra::{bpmp, fuse};
 
-/// The panic handler of package1.
+use crate::memory;
+use crate::SECURITY_ENGINE;
+use crate::{BOOTLOADER_SIZE, BOOTLOADER_START};
+
+extern "C" {
+    static mut __stack_top__: u32;
+}
+
+/// Implementation of the panic handler for the bootloader.
 ///
-/// The panic handler will
-/// - Reset stack pointer and zero out stack
-/// - Disable the security engine
-/// - Disable fuse programming
-/// - Clear PK11 key from memory
-/// - Clear PK11 blob from memory
-/// - Halt the bpmp
+/// The panic handler is either called when a Rust-side panic is hit through
+/// a more idiomatic wrapper or through the ARM exception vectors which will
+/// be poisoned with a pointer to this function.
+#[naked]
 #[no_mangle]
-pub extern "C" fn panic_handler() -> ! {
-    // Reset the stack pointer
-    let stack_top = unsafe { crate::stack_top() as *mut u8 };
-    unsafe {
-        asm!("ldr sp, {}", in(reg) stack_top as usize);
-    }
+pub unsafe extern "C" fn panic_handler() -> ! {
+    // Reset the stack pointer.
+    let stack_bottom = __stack_top__ as *mut u32;
+    asm!("ldr sp, {}", in(reg) stack_bottom as usize);
 
-    // Zero out the stack
-    unsafe {
-        mem::memset(stack_top..stack_top.offset(0x1000), 0);
-    }
+    // Clear the stack without overwriting the return address of `clear_mem`.
+    // XXX: Nintendo hardcodes a stack limit of 0x1000. Should we use the real stack offset?
+    let new_stack_bottom = stack_bottom.offset(-4);
+    memory::clear_mem(new_stack_bottom.offset(-0x1000)..new_stack_bottom);
 
-    // TODO: Disable security engine
+    // Disable the Security Engine.
+    SECURITY_ENGINE.disable();
 
+    // Disable fuse programming until next reboot.
     fuse::disable_programming();
 
-    // TODO: Clear PK11 Key from temporary buffer inmemory
+    // Clear the second-stage bootloader from memory.
+    memory::clear_mem(BOOTLOADER_START..BOOTLOADER_START.offset(BOOTLOADER_SIZE as isize));
 
-    // Clear PK11 blob from memory
-    unsafe {
-        let pk11 = PK11_ADDRESS as *mut u8;
-        let pk11_range = pk11..pk11.offset(PK11_SIZE as isize);
-        mem::memset(pk11_range, 0);
-    }
-
-    // Halt the bpmp
+    // Halt the Boot and Power Management processor.
     loop {
         bpmp::halt();
     }
 }
 
-/// Places the address of the [`panic_handler`] at the
-/// exception vector address.
+/// The exception handling personality function used by the bootloader.
 ///
-/// [`panic_handler`]: ./fn.panic_handler.html
-pub fn setup_exception_vector() {
-    let ev = EXCEPTION_VECTOR_BASE as *mut u32;
+/// Since there is no exception handling done here, this function does nothing
+/// and should also never get called.
+#[cfg(target_os = "none")]
+#[lang = "eh_personality"]
+#[no_mangle]
+pub extern fn eh_personality() {
+    // Purposefully do nothing.
+}
+
+/// Implementation of the panic function for the bootloader.
+///
+/// In case something went really wrong, log a message over UART and execute the
+/// lower-level [`panic_handler`] that is also invoked through ARM exception vectors.
+///
+/// [`panic_handler`]: fn.panic_handler.html
+#[cfg(target_os = "none")]
+#[no_mangle]
+#[panic_handler]
+pub extern fn panic(_info: &PanicInfo<'_>) -> ! {
+    #[cfg(feature = "debug_uart_port")]
+    let _ = writeln!(&mut Uart::E, "[Mirage] Rust panicked: {}", _info);
+
+    unsafe { panic_handler() }
+}
+
+/// Poisons the exception vectors of the BPMP with the lower-level [`panic_handler`]
+/// implementation of the bootloader.
+///
+/// [`panic_handler`]: fn.panic_handler.html
+pub fn setup_exception_vectors() {
+    let ev = EXCEPTION_VECTORS as *mut u32;
     let panic = panic_handler as *const () as u32;
+
     unsafe {
-        mem::memset(ev..ev.offset(8), panic);
+        memory::memset(ev..ev.offset(8), panic);
     }
 }

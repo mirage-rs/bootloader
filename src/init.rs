@@ -1,7 +1,7 @@
 //! Hardware initialization code for the Tegra X1 for the early bootrom context imposed
 //! by the RCM exploit CVE-2018-6242.
 
-use libtegra::i2c::{I2c, Error};
+use libtegra::i2c::{Error, I2c};
 use libtegra::pinmux::{
     PinEIoHv, PinFunction, PinGrP, PinIo, PinLock, PinOd, PinPull, PinTristate,
 };
@@ -234,11 +234,14 @@ fn config_pinmux() {
 
 fn config_pmc_scratch(pmc: &pmc::Registers) {
     // Unset Debug console from Customer Option.
-    pmc.APBDEV_PMC_SCRATCH20_0.set(pmc.APBDEV_PMC_SCRATCH20_0.get() & 0xFFF3_FFFF);
+    pmc.APBDEV_PMC_SCRATCH20_0
+        .set(pmc.APBDEV_PMC_SCRATCH20_0.get() & 0xFFF3_FFFF);
     // Unset DATA_DQ_E_IVREF EMC_PMACRO_DATA_PAD_TX_CTRL.
-    pmc.APBDEV_PMC_SCRATCH190_0.set(pmc.APBDEV_PMC_SCRATCH190_0.get() & 0xFFFF_FFFE);
+    pmc.APBDEV_PMC_SCRATCH190_0
+        .set(pmc.APBDEV_PMC_SCRATCH190_0.get() & 0xFFFF_FFFE);
     // Disable the fuse private key.
-    pmc.APBDEV_PMC_SECURE_SCRATCH21_0.set(pmc.APBDEV_PMC_SECURE_SCRATCH21_0.get() | 0x10);
+    pmc.APBDEV_PMC_SECURE_SCRATCH21_0
+        .set(pmc.APBDEV_PMC_SECURE_SCRATCH21_0.get() | 0x10);
 }
 
 /// Performs hardware initialization for the Tegra X1 SoC.
