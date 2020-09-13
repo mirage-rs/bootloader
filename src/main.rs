@@ -7,6 +7,7 @@
 #[cfg(not(any(target_arch = "arm", rustdoc, test)))]
 compile_error!("Please compile the first bootloader stage for ARM7TDMI!");
 
+#[macro_use]
 extern crate libtegra;
 
 mod init;
