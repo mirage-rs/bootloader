@@ -1,13 +1,16 @@
 .extern main
 .type main, %function
 
-.section .text.crt0, "ax", %progbits
+.section .text.rt, "ax", %progbits
 .arm
 .global _start
 .type _start, %function
 _start:
+    // Switch to 32-bit code mode and disable all interrupts.
+    msr cpsr_cxsf, #0xDF
+
     // Check if it is necessary to relocate.
-    ldr r0, =__payload_start__
+    ldr r0, =__start__
     adr r1, _start
     cmp r0, r1
     beq start
@@ -25,7 +28,7 @@ _start:
     bne copy_relocator
 
     // Use the relocator to copy the payload to the right place.
-    ldr r2, =__payload_end__
+    ldr r2, =__end__
     sub r2, r2, r0
     ldr r4, =__relocator__
     bx r4
@@ -57,11 +60,9 @@ relocator_end:
 //
 // Entrypoint to the actual bootloader code.
 //
-// Sets sp, destroys r0-r2.
-//
 start:
     // Set the stack pointer.
-    ldr sp, =__stack_top__
+    ldr sp, =__stack_end__
 
     // Jump to Rust entrypoint.
     bl main

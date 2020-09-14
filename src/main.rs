@@ -17,14 +17,17 @@ mod panic;
 use core::fmt::Write;
 use core::ops::Range;
 
+use libtegra::gpio;
+use libtegra::pinmux::{PinGrP, PinTristate};
 use libtegra::se::SecurityEngine;
+use libtegra::timer::sleep;
 #[cfg(feature = "debug_uart_port")]
 use libtegra::uart::Uart;
 
 use init::init_hardware;
 
 // Load crt0 from Assembly.
-global_asm!(include_str!("crt0.S"));
+global_asm!(include_str!("rt.S"));
 
 /// The global instance of the Security Engine to be used by the bootloader.
 pub const SECURITY_ENGINE: SecurityEngine = SecurityEngine::SE1;
@@ -54,13 +57,25 @@ unsafe fn bss_range() -> Range<*mut u32> {
     }
 }
 
+fn bring_up_backlight() {
+    PinGrP::LcdBlPwmPv0.set_tristate(PinTristate::Passthrough);
+    PinGrP::LcdBlEnPv1.set_tristate(PinTristate::Passthrough);
+
+    tegra_gpio!(V, 0).config(gpio::Config::OutputHigh);
+    tegra_gpio!(V, 1).config(gpio::Config::OutputHigh);
+
+    sleep(5);
+
+    tegra_gpio!(V, 0).write(gpio::Level::Low);
+}
+
 #[no_mangle]
 unsafe extern "C" fn main() {
     // Initialize the hardware from the early bootrom context we're currently in.
-    init_hardware().expect("Failed to initialize the hardware!");
+    //init_hardware().expect("Failed to initialize the hardware!");
 
     // Zero .bss section.
-    memory::memset(bss_range(), 0);
+    memory::clear_mem(bss_range());
 
     // Say hello, if debugging is enabled.
     #[cfg(feature = "debug_uart_port")]
@@ -68,6 +83,9 @@ unsafe extern "C" fn main() {
 
     // Poison the exception with the panic handler of the bootloader.
     panic::setup_exception_vectors();
+
+    // Bring up backlight for debugging.
+    bring_up_backlight();
 
     // TODO: Call init methods.
 }

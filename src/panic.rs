@@ -15,7 +15,8 @@ use crate::SECURITY_ENGINE;
 use crate::{BOOTLOADER_SIZE, BOOTLOADER_START};
 
 extern "C" {
-    static __stack_top__: u32;
+    static mut __stack_start__: u32;
+    static mut __stack_end__: u32;
 }
 
 /// Implementation of the panic handler for the bootloader.
@@ -27,13 +28,13 @@ extern "C" {
 #[no_mangle]
 pub unsafe extern "C" fn panic_handler() -> ! {
     // Reset the stack pointer.
-    let stack_bottom = __stack_top__ as *mut u32;
-    asm!("ldr sp, {}", in(reg) stack_bottom as usize);
+    let stack_bottom: *mut u32 = &mut __stack_end__;
+    asm!("mov sp, {}", in(reg) stack_bottom as usize);
 
     // Clear the stack without overwriting the return address of `clear_mem`.
     // XXX: Nintendo hardcodes a stack limit of 0x1000. Should we use the real stack offset?
-    let new_stack_bottom = stack_bottom.offset(-1);
-    memory::clear_mem(new_stack_bottom.offset(-0x400)..new_stack_bottom);
+    let stack_top: *mut u32 = &mut __stack_start__;
+    memory::clear_mem(stack_top..stack_bottom.offset(-1));
 
     // Disable the Security Engine.
     SECURITY_ENGINE.disable();

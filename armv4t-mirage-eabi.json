@@ -33,7 +33,7 @@
   "vendor": "mirage",
   "pre-link-args": {
     "ld.lld": [
-      "-Tlink.T"
+      "-Tlink.ld"
     ]
   }
 }
