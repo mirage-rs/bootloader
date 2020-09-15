@@ -1,5 +1,4 @@
-//! Hardware initialization code for the Tegra X1 for the early bootrom context imposed
-//! by the RCM exploit CVE-2018-6242.
+//! Hardware initialization for the NVIDIA Tegra X1.
 
 use libtegra::i2c::{Error, I2c};
 use libtegra::pinmux::{

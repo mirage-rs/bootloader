@@ -2,7 +2,8 @@ OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(_start)
 
-PHDRS {
+PHDRS
+{
   text    PT_LOAD FLAGS(5);
   rodata  PT_LOAD FLAGS(4);
   data    PT_LOAD FLAGS(6);
@@ -10,7 +11,8 @@ PHDRS {
 
 STACK_SIZE = 4K;
 
-SECTIONS {
+SECTIONS
+{
   /* The start address to the binary because we gain code execution through memory corruption. */
   PROVIDE(__start__     = 0x40010000);
 
