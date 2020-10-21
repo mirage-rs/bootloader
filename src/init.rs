@@ -209,9 +209,7 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
     car.CLK_RST_CONTROLLER_CLK_SYSTEM_RATE_0.set(0x2);
 }
 
-fn config_pinmux() {
-    let apb_misc = unsafe { &*apb::misc::REGISTERS };
-
+fn config_pinmux(apb_misc: &apb::misc::AmbaPeripheralBus) {
     // Clamp inputs when tristated.
     apb_misc.pp.APB_MISC_PP_PINMUX_GLOBAL_0_0.set(0);
 
@@ -242,8 +240,21 @@ fn config_pmc_scratch(pmc: &pmc::Registers) {
 
 /// Performs hardware initialization for the Tegra X1 SoC.
 pub fn init_hardware() -> Result<(), Error> {
+    let apb_misc = unsafe { &*apb::misc::REGISTERS };
     let car = unsafe { &*car::REGISTERS };
     let pmc = unsafe { &*pmc::REGISTERS };
+
+    // Clear the boot reason to avoid problems later on.
+    pmc.APBDEV_PMC_SCRATCH200_0.set(0);
+    pmc.APBDEV_PMC_RST_STATUS_0.set(0);
+    apb_misc
+        .pp
+        .APB_MISC_PP_STRAPPING_OPT_A_0
+        .set(apb_misc.pp.APB_MISC_PP_STRAPPING_OPT_A_0.get() & 0xF0);
+    apb_misc
+        .pp
+        .APB_MISC_PP_STRAPPING_OPT_A_0
+        .modify(apb::misc::misc_pp::APB_MISC_PP_STRAPPING_OPT_A_0::RCM_STRAPS.val(7));
 
     // Reboot the Security Engine.
     car::Clock::SE.enable();
@@ -259,7 +270,7 @@ pub fn init_hardware() -> Result<(), Error> {
     config_oscillators(car, pmc);
 
     // Initialize the SoC pin configurations.
-    config_pinmux();
+    config_pinmux(apb_misc);
 
     // Initialize UART E for debugging, if desired.
     #[cfg(feature = "debug_uart_port")]
