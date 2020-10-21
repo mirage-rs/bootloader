@@ -38,8 +38,8 @@ macro_rules! entrypoint {
             // Execute the .init_array methods of the binary.
             $crate::rt::call_init_array();
 
-            // TODO: Initialize the hardware.
-            //$crate::init::init_hardware().expect("Failed to initialize the hardware!");
+            // Initialize the hardware.
+            $crate::init::init_hardware().expect("Failed to initialize the hardware!");
 
             // Jump to the real Rust entrypoint.
             func();

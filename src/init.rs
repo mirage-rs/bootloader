@@ -101,7 +101,7 @@ const PIN_CONFIG: [(
         PinGrP::Pe6,
         PinFunction::Default,
         PinPull::None,
-        PinTristate::Tristate,
+        PinTristate::Passthrough,
         PinIo::Input,
         PinLock::Default,
         PinOd::Disable,
@@ -112,7 +112,7 @@ const PIN_CONFIG: [(
         PinGrP::Ph6,
         PinFunction::Default,
         PinPull::None,
-        PinTristate::Tristate,
+        PinTristate::Passthrough,
         PinIo::Input,
         PinLock::Default,
         PinOd::Disable,
@@ -172,7 +172,7 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
     car.CLK_RST_CONTROLLER_SPARE_REG0_0
         .set((car.CLK_RST_CONTROLLER_SPARE_REG0_0.get() & 0xFFFF_FFF3) | 0x4);
     // Set counter frequency.
-    sysctr0.SYSCTR0_CNTFID0_0.set(0x124F800);
+    sysctr0.SYSCTR0_CNTFID0_0.set(19200000);
     // Set 19.2MHz clk_m.
     timer.TIMERUS_USEC_CFG_0.set(0x45F);
     // Set OSC to 38.4MHz and drive strength.
@@ -200,7 +200,7 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
         .set((pmc.APBDEV_PMC_TSC_MULT_0.get() & 0xFFFF_0000) | 0x249F);
 
     // Set BPMP/SCLK div to 1.
-    car.CLK_RST_CONTROLLER_CLK_SYSTEM_RATE_0.set(0);
+    car.CLK_RST_CONTROLLER_CLK_SOURCE_SYS_0.set(0);
     // Set BPMP/SCLK source to Run and PLLP_OUT2 (204MHz).
     car.CLK_RST_CONTROLLER_SCLK_BURST_POLICY_0.set(0x2000_4444);
     // Enable SUPER_SDIV to 1.
@@ -210,24 +210,21 @@ fn config_oscillators(car: &car::Registers, pmc: &pmc::Registers) {
 }
 
 fn config_pinmux() {
+    let apb_misc = unsafe { &*apb::misc::REGISTERS };
+
     // Clamp inputs when tristated.
-    unsafe {
-        (&*apb::misc::REGISTERS)
-            .pp
-            .APB_MISC_PP_PINMUX_GLOBAL_0_0
-            .set(0)
-    };
+    apb_misc.pp.APB_MISC_PP_PINMUX_GLOBAL_0_0.set(0);
+
+    // Configure the GPIOs.
+    for entry in GPIO_CONFIG.iter() {
+        entry.0.config(entry.1);
+    }
 
     // Configure the pin multiplexing.
     for entry in PIN_CONFIG.iter() {
         entry.0.config(
             entry.1, entry.2, entry.3, entry.4, entry.5, entry.6, entry.7,
         );
-    }
-
-    // Configure the GPIOs.
-    for entry in GPIO_CONFIG.iter() {
-        entry.0.config(entry.1);
     }
 }
 
@@ -279,12 +276,13 @@ pub fn init_hardware() -> Result<(), Error> {
     I2c::C5.init();
 
     // Configure the PMIC.
-    I2c::C5.write_byte(MAX77620_PWR, 0x4, 0x40)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x04, 0x40)?;
+
     I2c::C5.write_byte(MAX77620_PWR, 0x41, 0x60)?;
     I2c::C5.write_byte(MAX77620_PWR, 0x43, 0x38)?;
     I2c::C5.write_byte(MAX77620_PWR, 0x44, 0x3A)?;
     I2c::C5.write_byte(MAX77620_PWR, 0x45, 0x38)?;
-    I2c::C5.write_byte(MAX77620_PWR, 0x4A, 0xF)?;
+    I2c::C5.write_byte(MAX77620_PWR, 0x4A, 0x0F)?;
     I2c::C5.write_byte(MAX77620_PWR, 0x4E, 0xC7)?;
     I2c::C5.write_byte(MAX77620_PWR, 0x4F, 0x4F)?;
     I2c::C5.write_byte(MAX77620_PWR, 0x50, 0x29)?;
