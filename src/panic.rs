@@ -19,14 +19,20 @@ extern "C" {
     static mut __stack_end__: u32;
 }
 
+/// `naked` function wrapper that will just call the [`rust_panic_handler`] function.
+#[naked]
+#[no_mangle]
+pub unsafe extern "C" fn panic_handler() -> ! {
+    asm!("bl rust_panic_handler", options(noreturn))
+}
+
 /// Implementation of the panic handler for the bootloader.
 ///
 /// The panic handler is either called when a Rust-side panic is hit through
 /// a more idiomatic wrapper or through the ARM exception vectors which will
 /// be poisoned with a pointer to this function.
-#[naked]
 #[no_mangle]
-pub unsafe extern "C" fn panic_handler() -> ! {
+pub unsafe extern "C" fn rust_panic_handler() -> ! {
     // Reset the stack pointer.
     let stack_bottom: *mut u32 = &mut __stack_end__;
     asm!("mov sp, {}", in(reg) stack_bottom as usize);
@@ -43,7 +49,7 @@ pub unsafe extern "C" fn panic_handler() -> ! {
     fuse::disable_programming();
 
     // Clear the second-stage bootloader from memory.
-    memory::clear_mem(BOOTLOADER_START..BOOTLOADER_START.offset(BOOTLOADER_SIZE as isize));
+    memory::clear_mem(BOOTLOADER_START..BOOTLOADER_START.add(BOOTLOADER_SIZE));
 
     // Halt the Boot and Power Management processor.
     loop {
@@ -58,7 +64,7 @@ pub unsafe extern "C" fn panic_handler() -> ! {
 #[cfg(target_os = "none")]
 #[lang = "eh_personality"]
 #[no_mangle]
-pub extern fn eh_personality() {
+pub extern "C" fn eh_personality() {
     // Purposefully do nothing.
 }
 
@@ -71,7 +77,7 @@ pub extern fn eh_personality() {
 #[cfg(target_os = "none")]
 #[no_mangle]
 #[panic_handler]
-pub extern fn panic(_info: &PanicInfo<'_>) -> ! {
+pub extern "C" fn panic(_info: &PanicInfo<'_>) -> ! {
     #[cfg(feature = "debug_uart_port")]
     let _ = writeln!(&mut Uart::E, "[Mirage] Rust panicked: {}", _info);
 

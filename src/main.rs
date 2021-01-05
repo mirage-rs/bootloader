@@ -44,8 +44,10 @@ const BOOTLOADER_START: *mut u32 = 0x4001_6FE0 as *mut _;
 const BOOTLOADER_SIZE: usize = 0x28810;
 
 fn bring_up_backlight() {
-    PinGrP::LcdBlPwmPv0.set_tristate(PinTristate::Passthrough);
-    PinGrP::LcdBlEnPv1.set_tristate(PinTristate::Passthrough);
+    unsafe {
+        PinGrP::LcdBlPwmPv0.set_tristate(PinTristate::Passthrough);
+        PinGrP::LcdBlEnPv1.set_tristate(PinTristate::Passthrough);
+    }
 
     tegra_gpio!(V, 0).config(gpio::Config::OutputHigh);
     tegra_gpio!(V, 1).config(gpio::Config::OutputHigh);

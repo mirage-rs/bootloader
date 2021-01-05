@@ -2,7 +2,7 @@
 
 use libtegra::i2c::{Error, I2c};
 use libtegra::pinmux::{
-    PinEIoHv, PinFunction, PinGrP, PinIo, PinLock, PinOd, PinPull, PinTristate,
+    PinFunction, PinGrP, PinIo, PinIoHv as PinEIoHv, PinLock, PinOd, PinPull, PinTristate,
 };
 #[cfg(feature = "debug_uart_port")]
 use libtegra::uart::{Uart, BAUD_115200};
@@ -220,9 +220,15 @@ fn config_pinmux(apb_misc: &apb::misc::AmbaPeripheralBus) {
 
     // Configure the pin multiplexing.
     for entry in PIN_CONFIG.iter() {
-        entry.0.config(
-            entry.1, entry.2, entry.3, entry.4, entry.5, entry.6, entry.7,
-        );
+        unsafe {
+            entry.0.set_function(entry.1);
+            entry.0.set_pull(entry.2);
+            entry.0.set_tristate(entry.3);
+            entry.0.set_io(entry.4);
+            entry.0.set_lock(entry.5);
+            entry.0.set_od(entry.6);
+            entry.0.set_io_hv(entry.7);
+        }
     }
 }
 

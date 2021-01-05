@@ -25,7 +25,7 @@
   "llvm-target": "armv4t-none-eabi",
   "os": "none",
   "panic-strategy": "abort",
-  "position-independent-executables": true,
+  "position-independent-executables": false,
   "relocation-model": "static",
   "target-c-int-width": "32",
   "target-endian": "little",

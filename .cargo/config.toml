@@ -1,5 +1,8 @@
-[unstable]
-build-std = ["core", "compiler_builtins"]
+[alias]
+bootloader = "objcopy -- -O binary bootloader.bin"
 
 [build]
 target = "armv4t-mirage-eabi.json"
+
+[unstable]
+build-std = ["core", "compiler_builtins"]
